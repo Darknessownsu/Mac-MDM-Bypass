@@ -15,7 +15,7 @@ Step 2: Open Safari and Copy the Script
 	
  1.	Open Safari in Recovery Mode by selecting Utilities > Safari.
 	
- 2.	Navigate to your GitHub repository where the script is hosted.
+ 2.	Navigate to the GitHub repository where the script is hosted.
 	
  3.	Click on the script file and then select “Raw” to view the plain text version.
 	
