@@ -1,33 +1,73 @@
+MDM & DEP Bypass Guide for macOS
+
 How to Use This Script
-	1.	Boot into macOS Recovery Mode on an M1 Mac:
-	•	Power off the Mac.
-	•	Press and hold the power button until you see “Loading startup options.”
-	•	Select Options > Continue to enter macOS Recovery Mode.
-	2.	Open Safari and Copy This Script
-	•	Open Safari in Recovery Mode (Utilities > Safari).
-	•	Copy the entire script from your GitHub or this page.
-	3.	Open Terminal in Recovery Mode
-	•	Click Utilities > Terminal.
-	•	Paste the script into Terminal (Command + V).
-	•	Press Enter to execute.
+
+Step 1: Boot into macOS Recovery Mode
+	
+ 1.	Power off the Mac.
+	
+ 2.	Press and hold the power button until you see “Loading startup options.”
+	
+ 3.	Select Options > Continue to enter macOS Recovery Mode.
+
+
+Step 2: Open Safari and Copy the Script
+	
+ 1.	Open Safari in Recovery Mode by selecting Utilities > Safari.
+	
+ 2.	Navigate to your GitHub repository where the script is hosted.
+	
+ 3.	Click on the script file and then select “Raw” to view the plain text version.
+	
+ 4.	Copy the entire script.
+
+
+Step 3: Open Terminal and Run the Script
+	
+ 1.	Click Utilities > Terminal in macOS Recovery Mode.
+	
+ 2.	Paste the script into Terminal by pressing Command + V.
+	
+ 3.	Press Enter to execute the script.
 
 What This Script Does
-	•	Removes MDM profiles
-	•	Prevents DEP re-enrollment by blocking Apple’s DEP server
-	•	Disables MDM daemons
-	•	Removes Jamf and other MDM frameworks
-	•	Flushes system cache
-	•	Enables stealth firewall mode
-	•	Resets NVRAM to clear persistent settings
-	•	Restarts the Mac automatically
+	
+ •	Removes MDM profiles
+	
+ •	Prevents DEP re-enrollment by blocking Apple’s DEP server
+	
+ •	Disables MDM daemons
+	
+ •	Removes Jamf and other MDM frameworks
+	
+ •	Flushes system cache
+	
+ •	Enables stealth firewall mode
+	
+ •	Resets NVRAM to clear persistent settings
+	
+ •	Restarts the Mac automatically
+
 
 Final Steps After Restart
-	1.	Set up macOS normally, but do not connect to Wi-Fi until setup is complete.
-	2.	Open Terminal and verify MDM is gone:
+	
+ 1.	Set up macOS normally, but do not connect to Wi-Fi until setup is complete.
+	
+ 2.	Open Terminal and verify MDM removal by running: profiles -P.
+	
+ 3.	If no MDM profiles appear, the device is free.
+	
+ 4.	If MDM is still present, repeat the process from Recovery Mode.
 
-profiles -P
+Important Notes
+	
+ •	Running this script before connecting to Wi-Fi prevents DEP from re-enrolling the device.
+	
+ •	If the Mac still forces MDM enrollment, reset NVRAM using sudo nvram -c.
+	
+ •	You can also block Apple’s DEP servers manually by adding 127.0.0.1 mdmenrollment.apple.com to the /etc/hosts file.
 
-	•	If no MDM profiles appear, the device is free.
-	•	If anything remains, repeat the process from Recovery Mode.
 
-This ensures MDM and DEP are fully bypassed on a freshly wiped macOS device. Let me know if you need any modifications.
+License
+
+This script is provided for educational purposes only. Use it responsibly.
