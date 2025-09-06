@@ -1,73 +1,93 @@
-MDM & DEP Bypass Guide for macOS
+**MAC MDM Evasion Utility**  
+**Version: 1.7**  
+**Author: Darknessownsu**  
 
-How to Use This Script
+## **Overview**
+The **MAC MDM Evasion Utility** is a menu-driven system tool designed for managing macOS enrollment, configuration profiles, and system volume states.  
 
-Step 1: Boot into macOS Recovery Mode
-	
- 1.	Power off the Mac.
-	
- 2.	Press and hold the power button until you see “Loading startup options.”
-	
- 3.	Select Options > Continue to enter macOS Recovery Mode.
+It provides a simple, interactive interface that allows administrators to:  
+- Remove or bypass MDM profiles  
+- Block DEP (Device Enrollment Program) endpoints  
+- Restore systems to stock compliance  
+- View shadow logs of actions  
+- Securely wipe traces  
 
+The utility is designed to appear and operate like a standard macOS configuration manager.  
 
-Step 2: Open Safari and Copy the Script
-	
- 1.	Open Safari in Recovery Mode by selecting Utilities > Safari.
-	
- 2.	Navigate to the GitHub repository where the script is hosted.
-	
- 3.	Click on the script file and then select “Raw” to view the plain text version.
-	
- 4.	Copy the entire script.
+**Features**
+1. **Run Evasion**  
+   - Disables SIP (System Integrity Protection) and authenticated root.  
+   - Mounts root volume writable.  
+   - Blocks Apple DEP endpoints.  
+   - Removes detected MDM profiles.  
+   - Terminates and removes Jamf or similar MDM daemons.  
+   - Clears unified logs, enables firewall stealth mode, resets NVRAM.  
+   - Installs a bypass enrollment profile.  
+   - Creates a new sealed snapshot for persistence.  
 
+2. **Run Reversion**  
+   - Removes any installed bypass profiles.  
+   - Restores original `/etc/hosts` from backup.  
+   - Re-enables SIP and authenticated root.  
+   - Creates a fresh sealed snapshot to lock in restored state.  
 
-Step 3: Open Terminal and Run the Script
-	
- 1.	Click Utilities > Terminal in macOS Recovery Mode.
-	
- 2.	Paste the script into Terminal by pressing Command + V.
-	
- 3.	Press Enter to execute the script.
+3. **Shadow Log Info**  
+   - Displays location of encrypted shadow log:  
+     /var/db/.shadow/mdm.log.enc  
+   - Provides command to decrypt using OpenSSL and the session key.  
 
-What This Script Does
-	
- •	Removes MDM profiles
-	
- •	Prevents DEP re-enrollment by blocking Apple’s DEP server
-	
- •	Disables MDM daemons
-	
- •	Removes Jamf and other MDM frameworks
-	
- •	Flushes system cache
-	
- •	Enables stealth firewall mode
-	
- •	Resets NVRAM to clear persistent settings
-	
- •	Restarts the Mac automatically
+4. **Self-Destruct / Wipe Traces**  
+   - Deletes shadow logs.  
+   - Removes all `/etc/hosts` backups.  
+   - Clears shell history.  
 
+5. **About This Utility**  
+   - Displays name, version, author, and build information in a clean Apple-like “About” panel.  
 
-Final Steps After Restart
-	
- 1.	Set up macOS normally, but do not connect to Wi-Fi until setup is complete.
-	
- 2.	Open Terminal and verify MDM removal by running: profiles -P.
-	
- 3.	If no MDM profiles appear, the device is free.
-	
- 4.	If MDM is still present, repeat the process from Recovery Mode.
+**Installation**
+1. Save the script as:  
+   enrollment_manager.sh  
 
-Important Notes
-	
- •	Running this script before connecting to Wi-Fi prevents DEP from re-enrolling the device.
-	
- •	If the Mac still forces MDM enrollment, reset NVRAM using sudo nvram -c.
-	
- •	You can also block Apple’s DEP servers manually by adding 127.0.0.1 mdmenrollment.apple.com to the /etc/hosts file.
+2. Make executable and install:  
+   sudo cp enrollment_manager.sh /usr/local/bin/enrollment  
+   sudo chmod +x /usr/local/bin/enrollment  
 
+3. Launch with:  
+   enrollment  
 
-License
+**Usage**
+On launch, the utility will display a numbered menu:  
 
-This script is provided for educational purposes only. Use it responsibly.
+=================================================  
+        MAC MDM Evasion Utility  
+        Version 1.7  
+        Author: Darknessownsu  
+-------------------------------------------------  
+ Manage enrollment and configuration profiles  
+ on your Mac with a secure, menu-driven utility.  
+-------------------------------------------------  
+
+Choose an option:  
+  1. Run Evasion  
+  2. Run Reversion  
+  3. Shadow Log Info  
+  4. Self-Destruct / Wipe Traces  
+  5. Exit  
+  6. About This Utility  
+
+Select the desired operation by entering its number.  
+
+**Shadow Logging**
+- All actions are echoed both to screen and into an encrypted shadow log.  
+- Log location: `/var/db/.shadow/mdm.log.enc`  
+- Decrypt command:  
+  openssl enc -aes-256-cbc -d -a -in /var/db/.shadow/mdm.log.enc -pass pass:<SESSION_KEY>  
+
+**Author**
+This utility is developed and maintained by:  
+**Darknessownsu**  
+
+Version 1.7 introduces:  
+- About panel option  
+- Streamlined Apple-style branding  
+- Expanded daemon detection  
