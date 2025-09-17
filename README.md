@@ -1,93 +1,123 @@
 **MAC MDM Evasion Utility**  
-**Version: 1.7**  
-**Author: Darknessownsu**  
+**Version: 1.8**  
+**Author: Darknessownsu
+
+---
 
 ## **Overview**
-The **MAC MDM Evasion Utility** is a menu-driven system tool designed for managing macOS enrollment, configuration profiles, and system volume states.  
+The **MAC MDM Evasion Utility** is a secure, menu-driven system tool designed for managing macOS MDM enrollment, configuration profiles, and system integrity states.  
 
-It provides a simple, interactive interface that allows administrators to:  
-- Remove or bypass MDM profiles  
-- Block DEP (Device Enrollment Program) endpoints  
-- Restore systems to stock compliance  
-- View shadow logs of actions  
-- Securely wipe traces  
+Built to mimic a legitimate Apple configuration tool, it provides powerful admin-level functions for:  
+- Evading or removing MDM profiles  
+- Blocking DEP (Device Enrollment Program) endpoints  
+- Obfuscating iCloud/Find My tracking  
+- Detecting and purging MDM daemons (Jamf, etc.)  
+- Auto-repairing bypass profile installs  
+- Enforcing stealth logging and secure trace wiping  
+- Reverting systems to compliance  
 
-The utility is designed to appear and operate like a standard macOS configuration manager.  
+---
 
-**Features**
-1. **Run Evasion**  
-   - Disables SIP (System Integrity Protection) and authenticated root.  
-   - Mounts root volume writable.  
-   - Blocks Apple DEP endpoints.  
-   - Removes detected MDM profiles.  
-   - Terminates and removes Jamf or similar MDM daemons.  
-   - Clears unified logs, enables firewall stealth mode, resets NVRAM.  
-   - Installs a bypass enrollment profile.  
-   - Creates a new sealed snapshot for persistence.  
+## **New in v1.8 — Watchdog-Class Enhancements**
+-  **Self-Healing LaunchAgent**: Reinstalls bypass profile every 5 minutes if removed.
+-  **Daemon Watchdog LaunchDaemon**: Kills MDM/Jamf daemons that reappear after reboot.
+-  **iCloud/FindMy Obfuscation**: Wipes NVRAM variables related to iCloud tracking.
+-  **Expanded log encryption**: AES-256 with session-bound key generation.
+-  **Sealed snapshot creation** after all actions for rollback protection.
 
-2. **Run Reversion**  
-   - Removes any installed bypass profiles.  
-   - Restores original `/etc/hosts` from backup.  
-   - Re-enables SIP and authenticated root.  
-   - Creates a fresh sealed snapshot to lock in restored state.  
+---
 
-3. **Shadow Log Info**  
-   - Displays location of encrypted shadow log:  
-     /var/db/.shadow/mdm.log.enc  
-   - Provides command to decrypt using OpenSSL and the session key.  
+## **Features**
+### 1. **Run Evasion**
+- Disables SIP and authenticated root.
+- Mounts system volume as writable.
+- Blocks DEP endpoints in `/etc/hosts`.
+- Removes active MDM profiles.
+- Kills and deletes Jamf/MDM daemons.
+- Clears logs, resets NVRAM, activates firewall stealth.
+- Installs fake `.mobileconfig` bypass profile.
+- Deploys persistent LaunchAgent & Watchdog Daemon.
+- Creates APFS snapshot post-operation.
 
-4. **Self-Destruct / Wipe Traces**  
-   - Deletes shadow logs.  
-   - Removes all `/etc/hosts` backups.  
-   - Clears shell history.  
+### 2. **Run Reversion**
+- Removes bypass profiles and restore `/etc/hosts` from backup.
+- Re-enables SIP and root authentication.
+- Removes stealth agents/daemons.
+- Creates fresh APFS snapshot to lock in restore.
 
-5. **About This Utility**  
-   - Displays name, version, author, and build information in a clean Apple-like “About” panel.  
+### 3. **Shadow Log Info**
+- Encrypted logs stored at `/var/db/.shadow/mdm.log.enc`
+- Log decryption example:
+  ```
+  openssl enc -aes-256-cbc -d -a -in /var/db/.shadow/mdm.log.enc -pass pass:<SESSION_KEY>
+  ```
 
-**Installation**
-1. Save the script as:  
-   enrollment_manager.sh  
+### 4. **Self-Destruct / Wipe Traces**
+- Deletes shadow log + host backups.
+- Clears shell history.
+- Ghosts your tracks.
 
-2. Make executable and install:  
-   sudo cp enrollment_manager.sh /usr/local/bin/enrollment  
-   sudo chmod +x /usr/local/bin/enrollment  
+### 5. **About This Utility**
+- Clean "About Panel" styled after legit Apple config apps.
+- Shows name, version, author, and patch lineage.
 
-3. Launch with:  
-   enrollment  
+---
 
-**Usage**
-On launch, the utility will display a numbered menu:  
+## **Installation**
+1. Save the script as:
+   ```
+   MAC_MDM_Evasion_Utility_v1.8.sh
+   ```
 
-=================================================  
-        MAC MDM Evasion Utility  
-        Version 1.7  
-        Author: Darknessownsu  
--------------------------------------------------  
- Manage enrollment and configuration profiles  
- on your Mac with a secure, menu-driven utility.  
--------------------------------------------------  
+2. Make it executable and install:
+   ```bash
+   sudo cp MAC_MDM_Evasion_Utility_v1.8.sh /usr/local/bin/enrollment
+   sudo chmod +x /usr/local/bin/enrollment
+   ```
 
-Choose an option:  
-  1. Run Evasion  
-  2. Run Reversion  
-  3. Shadow Log Info  
-  4. Self-Destruct / Wipe Traces  
-  5. Exit  
-  6. About This Utility  
+3. Launch with:
+   ```bash
+   enrollment
+   ```
 
-Select the desired operation by entering its number.  
+---
 
-**Shadow Logging**
-- All actions are echoed both to screen and into an encrypted shadow log.  
-- Log location: `/var/db/.shadow/mdm.log.enc`  
-- Decrypt command:  
-  openssl enc -aes-256-cbc -d -a -in /var/db/.shadow/mdm.log.enc -pass pass:<SESSION_KEY>  
+## **Usage**
+When launched, you’ll see a terminal interface:
 
-**Author**
-This utility is developed and maintained by:  
-**Darknessownsu**  
+```
+=================================================
+        MAC MDM Evasion Utility
+        Version 1.8
+        Author: Darknessownsu
+-------------------------------------------------
+ Manage enrollment and configuration profiles
+ on your Mac with a secure, menu-driven utility.
+-------------------------------------------------
+```
 
-Version 1.7 introduces:  
-- About panel option  
-- Streamlined Apple-style branding  
-- Expanded daemon detection  
+Choose:
+1. Run Evasion  
+2. Run Reversion  
+3. Shadow Log Info  
+4. Self-Destruct / Wipe Traces  
+5. Exit  
+6. About This Utility  
+
+---
+
+## **Encrypted Shadow Logging**
+- Logs mirror each printed action, encoded with AES-256.
+- Stored at `/var/db/.shadow/mdm.log.enc`.
+- Decrypt with session key:
+  ```bash
+  openssl enc -aes-256-cbc -d -a -in /var/db/.shadow/mdm.log.enc -pass pass:<SESSION_KEY>
+  ```
+
+---
+
+## **Author**
+This utility was created by **Darknessownsu**  
+Enhanced and patched for Watchdog-Class deployment
+
+> Version 1.8 is not just a utility — it’s a weapon. Use with precision.
