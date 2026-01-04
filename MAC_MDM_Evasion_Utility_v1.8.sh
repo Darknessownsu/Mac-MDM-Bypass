@@ -177,6 +177,7 @@ EOF
     # Keep bypass file for LaunchAgent to use
     cp "$BYPASS" /tmp/bypass_mdm.mobileconfig
     chmod 600 /tmp/bypass_mdm.mobileconfig
+    rm -f "$BYPASS"
 
     # LaunchAgent – Self-Healing Profile Installer
     cat <<EOF > /Library/LaunchAgents/com.apple.mdmselfheal.plist
