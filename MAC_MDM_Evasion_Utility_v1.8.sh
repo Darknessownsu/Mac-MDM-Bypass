@@ -285,7 +285,7 @@ stealthlogs() {
     status_bar "Shadow Log Info"
     echo "[*] Shadow log: $SHADOW_LOG"
     echo "[*] Decrypt with:"
-    echo "    openssl enc -aes-256-cbc -d -a -in $SHADOW_LOG -pass pass:$LOG_KEY"
+    echo "    openssl enc -aes-256-cbc -d -a -in $SHADOW_LOG -pass pass:\"$LOG_KEY\""
     read -r -p "Press Enter to return to menu..."
 }
 

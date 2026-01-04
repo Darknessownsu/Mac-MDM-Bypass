@@ -204,7 +204,7 @@ reversion() {
     csrutil enable 2>&1 | logmsg
     csrutil authenticated-root enable 2>&1 | logmsg
 
-    /usr/sbin/bless --mount / --bootefi --create-snapshot && echo "[*] Fresh snapshot created." | logmsg
+    /usr/sbin/bless --mount / --bootefi --create-snapshot 2>&1 | logmsg && echo "[*] Fresh snapshot created." | logmsg
 
     status_bar "Reversion Complete – Restart Required"
     read -r -p "Press Enter to return to menu..."
@@ -216,7 +216,7 @@ stealthlogs() {
     status_bar "Shadow Log Info"
     echo "[*] Shadow log: $SHADOW_LOG"
     echo "[*] Decrypt with:"
-    echo "    openssl enc -aes-256-cbc -d -a -in $SHADOW_LOG -pass pass:$LOG_KEY"
+    echo "    openssl enc -aes-256-cbc -d -a -in $SHADOW_LOG -pass pass:\"$LOG_KEY\""
     read -r -p "Press Enter to return to menu..."
 }
 
