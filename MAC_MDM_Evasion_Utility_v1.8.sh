@@ -12,12 +12,21 @@ AUTHOR="Darknessownsu"
 SHADOW_DIR="/var/db/.shadow"
 SHADOW_LOG="$SHADOW_DIR/mdm.log.enc"
 mkdir -p "$SHADOW_DIR"
-LOG_KEY=$(uuidgen | md5)
+
+# Generate encryption key with fallback for different systems
+if command -v md5 >/dev/null 2>&1; then
+    LOG_KEY=$(uuidgen | md5)
+elif command -v md5sum >/dev/null 2>&1; then
+    LOG_KEY=$(uuidgen | md5sum | awk '{print $1}')
+else
+    # Fallback to shasum if neither md5 nor md5sum available
+    LOG_KEY=$(uuidgen | shasum -a 256 | awk '{print $1}')
+fi
 
 logmsg() {
     while IFS= read -r line; do
         echo "$line"
-        echo "$line" | openssl enc -aes-256-cbc -a -salt -pass pass:$LOG_KEY >> "$SHADOW_LOG" 2>/dev/null
+        echo "$line" | openssl enc -aes-256-cbc -a -salt -pass pass:"$LOG_KEY" >> "$SHADOW_LOG" 2>/dev/null
     done
 }
 
@@ -178,7 +187,7 @@ EOF
 
     /usr/sbin/bless --mount / --bootefi --create-snapshot && echo "[*] Snapshot created." | logmsg
     status_bar "Evasion Complete – Restart Recommended"
-    read -p "Press Enter to return to menu..."
+    read -r -p "Press Enter to return to menu..."
 }
 
 reversion() {
@@ -187,8 +196,9 @@ reversion() {
     /usr/bin/profiles -R -p "com.bypass.mdm"
     /usr/bin/profiles -R -p "com.bypass.config"
 
-    if ls /etc/hosts.backup.* 1> /dev/null 2>&1; then
-        LATEST=$(ls -t /etc/hosts.backup.* | head -1)
+    # Find and restore latest backup using find instead of ls
+    LATEST=$(find /etc -maxdepth 1 -name "hosts.backup.*" -type f -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1)
+    if [ -n "$LATEST" ]; then
         cp "$LATEST" /etc/hosts
         echo "[*] Hosts restored from backup." | logmsg
     fi
@@ -205,7 +215,7 @@ reversion() {
     /usr/sbin/bless --mount / --bootefi --create-snapshot && echo "[*] Fresh snapshot created." | logmsg
 
     status_bar "Reversion Complete – Restart Required"
-    read -p "Press Enter to return to menu..."
+    read -r -p "Press Enter to return to menu..."
 }
 
 stealthlogs() {
@@ -214,17 +224,20 @@ stealthlogs() {
     echo "[*] Shadow log: $SHADOW_LOG"
     echo "[*] Decrypt with:"
     echo "    openssl enc -aes-256-cbc -d -a -in $SHADOW_LOG -pass pass:$LOG_KEY"
-    read -p "Press Enter to return to menu..."
+    read -r -p "Press Enter to return to menu..."
 }
 
 selfdestruct() {
     banner
     status_bar "Wiping Traces"
-    rm -rf "$SHADOW_DIR"/*
+    # Safety check before rm -rf
+    if [ -n "${SHADOW_DIR}" ] && [ -d "${SHADOW_DIR}" ]; then
+        rm -rf "${SHADOW_DIR:?}"/*
+    fi
     rm -rf /etc/hosts.backup.*
     history -c
     echo "[*] Self-destruct complete." | logmsg
-    read -p "Press Enter to return to menu..."
+    read -r -p "Press Enter to return to menu..."
 }
 
 about() {
@@ -242,7 +255,7 @@ about() {
     echo " securely into shadow storage."
     echo "-------------------------------------------------"
     echo
-    read -p "Press Enter to return to menu..."
+    read -r -p "Press Enter to return to menu..."
 }
 
 # ---------------------------
@@ -258,7 +271,7 @@ while true; do
     echo "  5. Exit"
     echo "  6. About This Utility"
     echo
-    read -p "Choice: " opt
+    read -r -p "Choice: " opt
     case $opt in
         1) evasion ;;
         2) reversion ;;
