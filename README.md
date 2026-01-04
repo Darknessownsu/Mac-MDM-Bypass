@@ -1,6 +1,18 @@
 **MAC MDM Evasion Utility**  
 **Version: 1.8**  
-**Author: Darknessownsu
+**Author: Darknessownsu**
+
+---
+
+## **⚠️ IMPORTANT LEGAL WARNING**
+
+This utility is provided **for educational purposes only**. Bypassing MDM or DEP on a device you do not own or have explicit permission to modify may violate:
+- Local, state, and federal laws
+- Corporate policies and employment agreements  
+- Educational institution policies
+- Terms of service agreements
+
+**The user assumes full responsibility for their actions.** The author is not liable for any misuse, damage, or legal consequences resulting from the use of this software.
 
 ---
 
@@ -63,6 +75,26 @@ Built to mimic a legitimate Apple configuration tool, it provides powerful admin
 
 ---
 
+## **Prerequisites**
+
+Before using this utility, ensure:
+- You have **physical access** to the Mac
+- You can boot into **Recovery Mode** (to disable SIP)
+- You have **administrator/root privileges**
+- You understand the **risks and legal implications**
+- You have a **backup** of important data
+- The Mac is running **macOS Big Sur (11.x) or newer** up to Sonoma
+
+### Required Steps Before First Use:
+1. Reboot into Recovery Mode (⌘+R at startup)
+2. Open Terminal from Utilities menu
+3. Run: `csrutil disable` to disable System Integrity Protection
+4. Run: `csrutil authenticated-root disable` for authenticated root
+5. Reboot normally
+6. Now you can run this utility
+
+---
+
 ## **Installation**
 1. Save the script as:
    ```
@@ -77,8 +109,20 @@ Built to mimic a legitimate Apple configuration tool, it provides powerful admin
 
 3. Launch with:
    ```bash
-   enrollment
+   sudo enrollment
    ```
+   
+   **Note:** The utility will automatically check for root privileges and prompt if not running as sudo.
+
+---
+
+## **Script Versions**
+
+This repository contains two versions:
+- **MAC_MDM_Evasion.sh** (v1.7) - Basic MDM evasion without watchdog features
+- **MAC_MDM_Evasion_Utility_v1.8.sh** (v1.8) - Enhanced with self-healing and watchdog capabilities
+
+Choose v1.8 for persistent protection or v1.7 for a simpler, one-time bypass.
 
 ---
 
@@ -113,6 +157,61 @@ Choose:
   ```bash
   openssl enc -aes-256-cbc -d -a -in /var/db/.shadow/mdm.log.enc -pass pass:<SESSION_KEY>
   ```
+
+---
+
+## **Troubleshooting**
+
+### Common Issues:
+
+**"This utility must be run as root"**
+- Solution: Run with `sudo` prefix
+
+**"Mount failed"**
+- Solution: Ensure you've disabled SIP and authenticated-root in Recovery Mode
+- The system volume must be remountable as read-write
+
+**"Operation not permitted"**
+- Solution: Check that SIP is disabled: `csrutil status`
+- May need to boot into Recovery Mode again
+
+**LaunchAgent/Daemon not loading**
+- Solution: Check permissions: `sudo chmod 644 /Library/Launch{Agents,Daemons}/*.plist`
+- Verify plist syntax: `plutil -lint /path/to/file.plist`
+
+**Profiles not installing**
+- Solution: Check that the profiles command works: `/usr/bin/profiles -P`
+- Ensure no existing MDM is blocking profile installation
+
+### If Something Goes Wrong:
+
+1. Boot into Recovery Mode
+2. Use Terminal to manually restore `/etc/hosts` from backup:
+   ```bash
+   cp /Volumes/Macintosh\ HD/etc/hosts.backup.* /Volumes/Macintosh\ HD/etc/hosts
+   ```
+3. Re-enable SIP if needed:
+   ```bash
+   csrutil enable
+   csrutil authenticated-root enable
+   ```
+
+---
+
+## **Security Considerations**
+
+- This utility modifies critical system files and settings
+- It disables important security features (SIP, authenticated root)
+- Shadow logs contain sensitive operation details
+- The encryption key is stored in memory during execution
+- Bypass profiles may be detectable by sophisticated MDM systems
+- Watchdog daemons run persistently and consume system resources
+
+**Best Practices:**
+- Only use on devices you own or have explicit permission to modify
+- Keep the encryption key secure if you need to access shadow logs
+- Use the reversion function to restore normal operation
+- Re-enable SIP after you're done to restore system security
 
 ---
 

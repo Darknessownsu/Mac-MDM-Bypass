@@ -9,6 +9,15 @@ APP_NAME="MAC MDM Evasion Utility"
 VERSION="1.8"
 AUTHOR="Darknessownsu"
 
+# Check for root privileges
+check_root() {
+    if [ "$EUID" -ne 0 ]; then
+        echo "[!] Error: This utility must be run as root or with sudo."
+        echo "[!] Please run: sudo $0"
+        exit 1
+    fi
+}
+
 SHADOW_DIR="/var/db/.shadow"
 SHADOW_LOG="$SHADOW_DIR/mdm.log.enc"
 mkdir -p "$SHADOW_DIR"
@@ -17,7 +26,7 @@ LOG_KEY=$(uuidgen | md5)
 logmsg() {
     while IFS= read -r line; do
         echo "$line"
-        echo "$line" | openssl enc -aes-256-cbc -a -salt -pass pass:$LOG_KEY >> "$SHADOW_LOG" 2>/dev/null
+        echo "$line" | openssl enc -aes-256-cbc -a -salt -pass pass:"$LOG_KEY" >> "$SHADOW_LOG" 2>/dev/null
     done
 }
 
@@ -42,13 +51,27 @@ status_bar() {
 }
 
 evasion() {
+    check_root
     banner
     status_bar "Running Evasion Sequence"
+    
+    echo "[!] WARNING: This will make significant system changes."
+    read -r -p "Continue? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "[*] Operation cancelled."
+        read -r -p "Press Enter to return to menu..."
+        return
+    fi
+    
     echo "[*] Disabling SIP + authenticated root..." | logmsg
-    csrutil disable
-    csrutil authenticated-root disable
+    csrutil disable 2>&1 | logmsg
+    csrutil authenticated-root disable 2>&1 | logmsg
 
-    /usr/bin/mount -uw / || { echo "[!] Mount failed." | logmsg; return; }
+    if ! /usr/bin/mount -uw / 2>&1 | logmsg; then
+        echo "[!] Mount failed. System may be in recovery mode." | logmsg
+        read -r -p "Press Enter to return to menu..."
+        return
+    fi
 
     HOSTS="/etc/hosts"
     [ -f "$HOSTS" ] && cp "$HOSTS" "$HOSTS.backup.$(date +%s)" && echo "[*] Hosts backup saved." | logmsg
@@ -178,34 +201,45 @@ EOF
 
     /usr/sbin/bless --mount / --bootefi --create-snapshot && echo "[*] Snapshot created." | logmsg
     status_bar "Evasion Complete – Restart Recommended"
-    read -p "Press Enter to return to menu..."
+    read -r -p "Press Enter to return to menu..."
 }
 
 reversion() {
+    check_root
     banner
     status_bar "Running Reversion Sequence"
-    /usr/bin/profiles -R -p "com.bypass.mdm"
-    /usr/bin/profiles -R -p "com.bypass.config"
+    
+    echo "[!] WARNING: This will revert system changes."
+    read -r -p "Continue? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "[*] Operation cancelled."
+        read -r -p "Press Enter to return to menu..."
+        return
+    fi
+    
+    /usr/bin/profiles -R -p "com.bypass.mdm" 2>&1 | logmsg
+    /usr/bin/profiles -R -p "com.bypass.config" 2>&1 | logmsg
 
     if ls /etc/hosts.backup.* 1> /dev/null 2>&1; then
-        LATEST=$(ls -t /etc/hosts.backup.* | head -1)
-        cp "$LATEST" /etc/hosts
-        echo "[*] Hosts restored from backup." | logmsg
+        LATEST=$(find /etc -name "hosts.backup.*" -type f -print0 | xargs -0 ls -t | head -1)
+        if [ -n "$LATEST" ] && [ -f "$LATEST" ]; then
+            cp "$LATEST" /etc/hosts && echo "[*] Hosts restored from backup." | logmsg
+        fi
     fi
 
-    csrutil enable
-    csrutil authenticated-root enable
+    csrutil enable 2>&1 | logmsg
+    csrutil authenticated-root enable 2>&1 | logmsg
 
-    launchctl unload /Library/LaunchAgents/com.apple.mdmselfheal.plist
+    launchctl unload /Library/LaunchAgents/com.apple.mdmselfheal.plist 2>&1 | logmsg
     rm -f /Library/LaunchAgents/com.apple.mdmselfheal.plist
 
-    launchctl unload /Library/LaunchDaemons/com.watchdog.mdm.plist
+    launchctl unload /Library/LaunchDaemons/com.watchdog.mdm.plist 2>&1 | logmsg
     rm -f /Library/LaunchDaemons/com.watchdog.mdm.plist
 
     /usr/sbin/bless --mount / --bootefi --create-snapshot && echo "[*] Fresh snapshot created." | logmsg
 
     status_bar "Reversion Complete – Restart Required"
-    read -p "Press Enter to return to menu..."
+    read -r -p "Press Enter to return to menu..."
 }
 
 stealthlogs() {
@@ -214,17 +248,27 @@ stealthlogs() {
     echo "[*] Shadow log: $SHADOW_LOG"
     echo "[*] Decrypt with:"
     echo "    openssl enc -aes-256-cbc -d -a -in $SHADOW_LOG -pass pass:$LOG_KEY"
-    read -p "Press Enter to return to menu..."
+    read -r -p "Press Enter to return to menu..."
 }
 
 selfdestruct() {
+    check_root
     banner
     status_bar "Wiping Traces"
-    rm -rf "$SHADOW_DIR"/*
+    
+    echo "[!] WARNING: This will permanently delete shadow logs and backups."
+    read -r -p "Continue? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "[*] Operation cancelled."
+        read -r -p "Press Enter to return to menu..."
+        return
+    fi
+    
+    [ -n "$SHADOW_DIR" ] && rm -rf "${SHADOW_DIR:?}"/*
     rm -rf /etc/hosts.backup.*
     history -c
     echo "[*] Self-destruct complete." | logmsg
-    read -p "Press Enter to return to menu..."
+    read -r -p "Press Enter to return to menu..."
 }
 
 about() {
@@ -242,7 +286,7 @@ about() {
     echo " securely into shadow storage."
     echo "-------------------------------------------------"
     echo
-    read -p "Press Enter to return to menu..."
+    read -r -p "Press Enter to return to menu..."
 }
 
 # ---------------------------
@@ -258,7 +302,7 @@ while true; do
     echo "  5. Exit"
     echo "  6. About This Utility"
     echo
-    read -p "Choice: " opt
+    read -r -p "Choice: " opt
     case $opt in
         1) evasion ;;
         2) reversion ;;
