@@ -393,8 +393,11 @@ while true; do
         2) reversion ;;
         3) stealthlogs ;;
         4) selfdestruct ;;
-        5) exit 0 ;;
+        5) echo "[*] Exiting..."; exit 0 ;;
         6) about ;;
-        *) echo "[!] Invalid choice." ;;
+        "") echo "[!] No input provided. Please select an option (1-6)." 
+            read -r -p "Press Enter to continue..." ;;
+        *) echo "[!] Invalid choice: '$opt'. Please enter a number between 1-6." 
+           read -r -p "Press Enter to continue..." ;;
     esac
 done

@@ -1,0 +1,35 @@
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Log files
+*.log
+*.log.*
+
+# Backup files
+*.backup
+*.bak
+*~
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might be created by the MDM bypass utility
+/var/db/.shadow/
+*.mobileconfig
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-*
+
+# Test files
+test_*
