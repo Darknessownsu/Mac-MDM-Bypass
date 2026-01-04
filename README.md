@@ -160,6 +160,40 @@ Choose:
 
 ---
 
+## **Testing and Verification**
+
+After running the evasion utility, you can verify it worked:
+
+### Check MDM Status:
+```bash
+sudo profiles -P  # Should show the bypass profile
+sudo profiles status -type enrollment  # Check enrollment status
+```
+
+### Check Launch Agents/Daemons (v1.8 only):
+```bash
+launchctl list | grep -i mdm  # Check for watchdog processes
+ls -la /Library/LaunchAgents/com.apple.mdmselfheal.plist
+ls -la /Library/LaunchDaemons/com.watchdog.mdm.plist
+```
+
+### Check Hosts File:
+```bash
+cat /etc/hosts | grep -i mdm  # Should show blocked endpoints
+```
+
+### Check SIP Status:
+```bash
+csrutil status  # Should show "disabled"
+```
+
+### Verify Shadow Log:
+```bash
+ls -la /var/db/.shadow/mdm.log.enc  # Check if log exists
+```
+
+---
+
 ## **Troubleshooting**
 
 ### Common Issues:

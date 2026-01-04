@@ -24,9 +24,13 @@ check_root() {
 
 SHADOW_DIR="/var/db/.shadow"
 SHADOW_LOG="$SHADOW_DIR/mdm.log.enc"
-mkdir -p "$SHADOW_DIR"
+mkdir -p "$SHADOW_DIR" 2>/dev/null
 LOG_KEY=$(uuidgen | md5)
 
+# ---------------------------
+# Logging Function
+# ---------------------------
+# Logs messages to console and encrypted shadow log
 logmsg() {
     while IFS= read -r line; do
         echo "$line"
@@ -34,6 +38,10 @@ logmsg() {
     done
 }
 
+# ---------------------------
+# Display Functions
+# ---------------------------
+# Displays banner with app information
 banner() {
     clear
     echo "================================================="
@@ -47,6 +55,7 @@ banner() {
     echo
 }
 
+# Displays status bar with message
 status_bar() {
     local msg=$1
     echo "-------------------------------------------------"
@@ -58,6 +67,7 @@ status_bar() {
 # Core Functions
 # ---------------------------
 
+# Performs MDM evasion by disabling security features and installing bypass profile
 evasion() {
     check_root
     banner
@@ -82,24 +92,36 @@ evasion() {
     fi
 
     HOSTS="/etc/hosts"
+    if [ ! -f "$HOSTS" ]; then
+        echo "[!] Error: /etc/hosts file not found." | logmsg
+        read -r -p "Press Enter to return to menu..."
+        return
+    fi
     [ -f "$HOSTS" ] && cp "$HOSTS" "$HOSTS.backup.$(date +%s)" && echo "[*] Hosts backup saved." | logmsg
     for ep in mdmenrollment.apple.com deviceenrollment.apple.com gdmf.apple.com; do
         grep -q "$ep" "$HOSTS" || echo "127.0.0.1 $ep" >> "$HOSTS"
     done
 
-    PROFILES=$(/usr/bin/profiles -P | grep "uuid" | awk -F: '{print $2}' | tr -d ' ')
-    for ID in $PROFILES; do
-        echo "[*] Removing $ID..." | logmsg
-        /usr/bin/profiles -R -p "$ID"
-    done
+    PROFILES=$(/usr/bin/profiles -P 2>/dev/null | grep "uuid" | awk -F: '{print $2}' | tr -d ' ')
+    if [ -z "$PROFILES" ]; then
+        echo "[*] No MDM profiles found to remove." | logmsg
+    else
+        for ID in $PROFILES; do
+            echo "[*] Removing profile: $ID..." | logmsg
+            /usr/bin/profiles -R -p "$ID" 2>&1 | logmsg
+        done
+    fi
 
+    # Disable rogue MDM daemons
+    shopt -s nullglob  # Handle case when no files match
     for svc in /Library/LaunchDaemons/*.plist; do
-        if grep -qiE 'jamf|mdm|dep' "$svc"; then
-            launchctl bootout system "$svc"
-            rm -f "$svc"
-            echo "[*] Disabled rogue daemon: $svc" | logmsg
+        [ -f "$svc" ] || continue
+        if grep -qiE 'jamf|mdm|dep' "$svc" 2>/dev/null; then
+            launchctl bootout system "$svc" 2>&1 | logmsg
+            rm -f "$svc" && echo "[*] Disabled rogue daemon: $svc" | logmsg
         fi
     done
+    shopt -u nullglob
 
     for dir in "/usr/local/jamf" "/Library/Application Support/Jamf"; do
         [ -d "$dir" ] && rm -rf "$dir" && echo "[*] Removed $dir" | logmsg
@@ -109,7 +131,7 @@ evasion() {
     /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on
     /usr/sbin/nvram -c
 
-    BYPASS="/tmp/bypass_mdm.mobileconfig"
+    BYPASS=$(mktemp /tmp/bypass_mdm.XXXXXX.mobileconfig)
     cat <<EOF > "$BYPASS"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -141,14 +163,21 @@ evasion() {
 </dict>
 </plist>
 EOF
-    /usr/bin/profiles -I -F "$BYPASS" && echo "[*] Bypass profile installed." | logmsg
+    chmod 600 "$BYPASS"  # Restrict access to root only
+    if /usr/bin/profiles -I -F "$BYPASS" 2>&1 | logmsg; then
+        echo "[*] Bypass profile installed successfully." | logmsg
+    else
+        echo "[!] Failed to install bypass profile." | logmsg
+    fi
+    rm -f "$BYPASS"  # Clean up temporary file
 
-    /usr/sbin/bless --mount / --bootefi --create-snapshot && echo "[*] Snapshot created." | logmsg
+    /usr/sbin/bless --mount / --bootefi --create-snapshot 2>&1 | logmsg && echo "[*] Snapshot created." | logmsg
 
     status_bar "Evasion Complete – Restart Recommended"
     read -r -p "Press Enter to return to menu..."
 }
 
+# Reverts MDM evasion changes and restores system to normal state
 reversion() {
     check_root
     banner
@@ -181,6 +210,7 @@ reversion() {
     read -r -p "Press Enter to return to menu..."
 }
 
+# Displays information about shadow log and decryption
 stealthlogs() {
     banner
     status_bar "Shadow Log Info"
@@ -190,6 +220,7 @@ stealthlogs() {
     read -r -p "Press Enter to return to menu..."
 }
 
+# Removes all traces including logs and backups
 selfdestruct() {
     check_root
     banner
@@ -210,6 +241,7 @@ selfdestruct() {
     read -r -p "Press Enter to return to menu..."
 }
 
+# Displays about information for the utility
 about() {
     banner
     echo "-------------------------------------------------"
@@ -242,13 +274,20 @@ while true; do
     echo "  6. About This Utility"
     echo
     read -r -p "Choice: " opt
+    
+    # Validate input is a number between 1-6
+    if ! [[ "$opt" =~ ^[1-6]$ ]]; then
+        echo "[!] Invalid choice. Please enter a number between 1 and 6."
+        read -r -p "Press Enter to continue..."
+        continue
+    fi
+    
     case $opt in
         1) evasion ;;
         2) reversion ;;
         3) stealthlogs ;;
         4) selfdestruct ;;
-        5) exit 0 ;;
+        5) echo "[*] Exiting..."; exit 0 ;;
         6) about ;;
-        *) echo "[!] Invalid choice." ;;
     esac
 done
