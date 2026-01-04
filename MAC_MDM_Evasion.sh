@@ -230,8 +230,11 @@ reversion() {
         /usr/bin/profiles -R -p "com.bypass.config" 2>/dev/null
     fi
 
-    # Find and restore latest backup using find instead of ls
-    LATEST=$(find /etc -maxdepth 1 -name "hosts.backup.*" -type f -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1)
+    # Find and restore latest backup
+    # Using stat for macOS compatibility (works on both BSD and GNU)
+    LATEST=$(find /etc -maxdepth 1 -name "hosts.backup.*" -type f 2>/dev/null | while read -r file; do
+        echo "$(stat -f %m "$file" 2>/dev/null || stat -c %Y "$file" 2>/dev/null) $file"
+    done | sort -rn | head -1 | cut -d' ' -f2-)
     if [ -n "$LATEST" ]; then
         if cp "$LATEST" /etc/hosts 2>/dev/null; then
             echo "[*] Hosts restored from backup." | logmsg
