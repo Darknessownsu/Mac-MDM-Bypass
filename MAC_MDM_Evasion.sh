@@ -83,8 +83,8 @@ evasion() {
     fi
     
     echo "[*] Disabling SIP + authenticated root..." | logmsg
-    csrutil disable 2>&1 | logmsg
-    csrutil authenticated-root disable 2>&1 | logmsg
+    echo "[!] Note: 'csrutil' commands must be run from macOS Recovery and cannot be executed by this utility." | logmsg
+    echo "[!] Please reboot into Recovery, disable SIP and authenticated root manually, then rerun this tool if needed." | logmsg
 
     if ! /usr/bin/mount -uw / 2>&1 | logmsg; then
         echo "[!] Mount failed. System may be in recovery mode." | logmsg
