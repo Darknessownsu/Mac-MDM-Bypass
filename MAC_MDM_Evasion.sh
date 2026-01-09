@@ -22,6 +22,7 @@ check_root() {
     fi
 }
 
+check_root
 SHADOW_DIR="/var/db/.shadow"
 SHADOW_LOG="$SHADOW_DIR/mdm.log.enc"
 mkdir -p "$SHADOW_DIR" 2>/dev/null
