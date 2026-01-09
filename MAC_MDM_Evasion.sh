@@ -201,8 +201,10 @@ reversion() {
         fi
     fi
 
-    csrutil enable 2>&1 | logmsg
-    csrutil authenticated-root enable 2>&1 | logmsg
+    echo "[!] NOTE: System Integrity Protection (SIP) and authenticated root cannot be re-enabled from normal boot." | logmsg
+    echo "[!] To fully revert system security settings, you must reboot into macOS Recovery and run:" | logmsg
+    echo "    csrutil enable" | logmsg
+    echo "    csrutil authenticated-root enable" | logmsg
 
     /usr/sbin/bless --mount / --bootefi --create-snapshot 2>&1 | logmsg && echo "[*] Fresh snapshot created." | logmsg
 
