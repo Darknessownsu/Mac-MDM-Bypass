@@ -305,7 +305,12 @@ selfdestruct() {
     fi
     
     [ -n "$SHADOW_DIR" ] && rm -rf "${SHADOW_DIR:?}"/*
-    rm -rf /etc/hosts.backup.*
+    for host_backup in /etc/hosts.backup.*; do
+        [ -e "$host_backup" ] || break
+        if [ -f "$host_backup" ]; then
+            rm -f -- "$host_backup"
+        fi
+    done
     history -c
     echo "[*] Self-destruct complete." | logmsg
     read -r -p "Press Enter to return to menu..."
