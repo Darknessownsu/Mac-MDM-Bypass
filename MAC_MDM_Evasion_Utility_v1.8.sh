@@ -266,8 +266,15 @@ reversion() {
         fi
     fi
 
-    csrutil enable 2>&1 | logmsg
-    csrutil authenticated-root enable 2>&1 | logmsg
+    # NOTE: SIP and authenticated root cannot be re-enabled from normal macOS boot.
+    # To restore system protections, reboot into macOS Recovery and run:
+    #   csrutil enable
+    #   csrutil authenticated-root enable
+    echo "[!] SIP and authenticated root were previously modified." | logmsg
+    echo "[!] They cannot be automatically re-enabled from normal boot mode." | logmsg
+    echo "[*] After this reversion completes, reboot into macOS Recovery and run:" | logmsg
+    echo "    csrutil enable" | logmsg
+    echo "    csrutil authenticated-root enable" | logmsg
 
     launchctl unload /Library/LaunchAgents/com.apple.mdmselfheal.plist 2>&1 | logmsg
     rm -f /Library/LaunchAgents/com.apple.mdmselfheal.plist
