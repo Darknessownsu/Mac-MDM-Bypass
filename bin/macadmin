@@ -3,27 +3,40 @@ set -u
 PATH=/usr/bin:/bin:/usr/sbin:/sbin
 LC_ALL=C
 export PATH LC_ALL
-version=2.0.0-alpha.2
+version=2.0.0-alpha.3
 usage() {
-  printf '%s\n' 'MacAdmin Toolkit — read-only diagnostics' 'Usage: bash bin/macadmin [status|security|enrollment|all|--help|--version]' 'No system settings are modified.'
+  printf '%s\n' 'MacAdmin Toolkit — read-only diagnostics' 'Usage: bash bin/macadmin [status|security|enrollment|health|all] [--shared|--json]' '       bash bin/macadmin --help|--version' 'No system settings are modified. Shared and JSON reports omit raw probe output.'
 }
-if [ "$#" -gt 1 ]; then usage >&2; exit 2; fi
-case "${1:---help}" in
-  --help|-h) usage; exit 0 ;;
-  --version) printf '%s\n' "$version"; exit 0 ;;
-  status|security|enrollment|all) ;;
+cmd="${1:---help}"
+report_format=text
+case "$cmd" in
+  --help|-h|--version)
+    if [ "$#" -gt 1 ]; then usage >&2; exit 2; fi
+    if [ "$cmd" = --version ]; then printf '%s\n' "$version"; else usage; fi
+    exit 0 ;;
+  status|security|enrollment|health|all) ;;
   *) usage >&2; exit 2 ;;
 esac
+if [ "$#" -gt 2 ]; then usage >&2; exit 2; fi
+if [ "$#" -eq 2 ]; then
+  case "$2" in --shared) report_format=shared;; --json) report_format=json;; *) usage >&2; exit 2;; esac
+fi
 if [ "$(uname -s)" != Darwin ]; then
   printf '%s\n' 'Diagnostics require macOS.' >&2
   exit 3
 fi
 root="$(cd "$(dirname "$0")/.." && pwd)" || exit 1
+. "$root/lib/report.sh" || exit 1
 . "$root/lib/core.sh" || exit 1
 . "$root/lib/diagnostics.sh" || exit 1
-case "$1" in
-  status) diagnose_status ;;
-  security) diagnose_security ;;
-  enrollment) diagnose_enrollment ;;
-  all) diagnose_all ;;
+report_begin
+rc=0
+case "$cmd" in
+  status) diagnose_status || rc=1 ;;
+  security) diagnose_security || rc=1 ;;
+  enrollment) diagnose_enrollment || rc=1 ;;
+  health) diagnose_health || rc=1 ;;
+  all) diagnose_all || rc=1 ;;
 esac
+report_end
+exit "$rc"
