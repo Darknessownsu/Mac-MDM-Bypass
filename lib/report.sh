@@ -2,19 +2,21 @@
 report_begin() {
   report_first=1
   if [ "$report_format" = json ]; then
-    printf '{"schema_version":1,"privacy":"status-only","checks":['
+    printf '{"schema_version":2,"privacy":"status-only","checks":['
   fi
 }
 report_result() {
-  local label="$1" state="$2" rc="$3" output="$4"
+  local label="$1" state="$2" rc="$3" output="$4" classification
+  classification=unknown
+  if [ "$state" = completed ]; then classification=$(classify_result "$label" "$output"); fi
   if [ "$report_format" = json ]; then
     # Labels are fixed internal constants; reject unexpected characters.
     case "$label" in *[!a-zA-Z0-9\ ]*) return 1;; esac
     if [ "$report_first" -eq 0 ]; then printf ','; fi
     report_first=0
-    printf '{"check":"%s","status":"%s","exit_code":%s}' "$label" "$state" "$rc"
+    printf '{"check":"%s","status":"%s","exit_code":%s,"classification":"%s"}' "$label" "$state" "$rc" "$classification"
   elif [ "$report_format" = shared ]; then
-    printf '%s: %s (exit %s)\n' "$label" "$state" "$rc"
+    printf '%s: %s (exit %s; classification %s)\n' "$label" "$state" "$rc" "$classification"
   elif [ "$state" = completed ]; then
     printf '%s: %s\n' "$label" "$output"
   else
