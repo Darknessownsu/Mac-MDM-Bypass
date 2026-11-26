@@ -3,9 +3,9 @@ set -u
 PATH=/usr/bin:/bin:/usr/sbin:/sbin
 LC_ALL=C
 export PATH LC_ALL
-version=2.0.0-alpha.4
+version=2.0.0-rc.1
 usage() {
-  printf '%s\n' 'MacAdmin Toolkit — read-only diagnostics' 'Usage: bash bin/macadmin [status|security|enrollment|health|all] [--shared|--json]' '       bash bin/macadmin --help|--version' 'No system settings are modified. Shared and JSON reports omit raw probe output.'
+  printf '%s\n' 'MacAdmin Toolkit — read-only diagnostics' 'Usage: bash bin/macadmin [status|security|enrollment|health|all] [--shared|--json]' '       bash bin/macadmin menu|recovery|--help|--version' 'No system settings are modified. Shared and JSON reports omit raw probe output.'
 }
 cmd="${1:---help}"
 report_format=text
@@ -14,6 +14,13 @@ case "$cmd" in
     if [ "$#" -gt 1 ]; then usage >&2; exit 2; fi
     if [ "$cmd" = --version ]; then printf '%s\n' "$version"; else usage; fi
     exit 0 ;;
+  recovery)
+    [ "$#" -eq 1 ] || { usage >&2; exit 2; }
+    root="$(cd "$(dirname "$0")/.." && pwd)" || exit 1
+    /bin/cat "$root/docs/RECOVERY.md"
+    exit $? ;;
+  menu)
+    [ "$#" -eq 1 ] || { usage >&2; exit 2; } ;;
   status|security|enrollment|health|all) ;;
   *) usage >&2; exit 2 ;;
 esac
@@ -30,6 +37,8 @@ root="$(cd "$(dirname "$0")/.." && pwd)" || exit 1
 . "$root/lib/classify.sh" || exit 1
 . "$root/lib/core.sh" || exit 1
 . "$root/lib/diagnostics.sh" || exit 1
+. "$root/lib/menu.sh" || exit 1
+if [ "$cmd" = menu ]; then show_menu; exit $?; fi
 report_begin
 rc=0
 case "$cmd" in
