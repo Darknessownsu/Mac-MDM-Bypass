@@ -15,10 +15,17 @@ diagnose_security() {
 diagnose_enrollment() {
   probe 'Enrollment' /usr/bin/profiles status -type enrollment
 }
+diagnose_health() {
+  local rc=0
+  probe 'Root volume capacity' /bin/df -k / || rc=1
+  probe 'Uptime' /usr/bin/uptime || rc=1
+  return "$rc"
+}
 diagnose_all() {
   local rc=0
   diagnose_status || rc=1
   diagnose_security || rc=1
   diagnose_enrollment || rc=1
+  diagnose_health || rc=1
   return "$rc"
 }
