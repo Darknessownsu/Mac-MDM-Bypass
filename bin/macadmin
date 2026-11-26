@@ -3,7 +3,7 @@ set -u
 PATH=/usr/bin:/bin:/usr/sbin:/sbin
 LC_ALL=C
 export PATH LC_ALL
-version=2.0.0-alpha.3
+version=2.0.0-alpha.4
 usage() {
   printf '%s\n' 'MacAdmin Toolkit — read-only diagnostics' 'Usage: bash bin/macadmin [status|security|enrollment|health|all] [--shared|--json]' '       bash bin/macadmin --help|--version' 'No system settings are modified. Shared and JSON reports omit raw probe output.'
 }
@@ -27,6 +27,7 @@ if [ "$(uname -s)" != Darwin ]; then
 fi
 root="$(cd "$(dirname "$0")/.." && pwd)" || exit 1
 . "$root/lib/report.sh" || exit 1
+. "$root/lib/classify.sh" || exit 1
 . "$root/lib/core.sh" || exit 1
 . "$root/lib/diagnostics.sh" || exit 1
 report_begin
