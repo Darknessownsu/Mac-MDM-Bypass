@@ -20,4 +20,7 @@ jobs:
           bash -n lib/core.sh
           bash -n lib/diagnostics.sh
           bash tests/smoke.sh
+          bash -n lib/report.sh
+          bash -n lib/classify.sh
           bash tests/unit.sh
+          bash tests/classification.sh
