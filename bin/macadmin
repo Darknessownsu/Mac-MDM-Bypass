@@ -1,0 +1,49 @@
+#!/bin/bash
+# MacAdmin Toolkit 2.0 — read-only diagnostics.
+set -u
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export PATH
+LC_ALL=C
+export LC_ALL
+version=2.0.0-alpha.1
+usage() {
+  printf '%s\n' 'MacAdmin Toolkit — read-only diagnostics' 'Usage: bash bin/macadmin [status|security|enrollment|--help|--version]' 'No system settings are modified.'
+}
+probe() {
+  local label="$1" output rc
+  shift
+  if output=$("$@" 2>&1); then
+    printf '%s: %s\n' "$label" "$output"
+  else
+    rc=$?
+    printf '%s: unavailable (exit %s)\n' "$label" "$rc"
+    return 1
+  fi
+}
+case "${1:---help}" in
+  --help|-h) usage; exit 0 ;;
+  --version) printf '%s\n' "$version"; exit 0 ;;
+  status|security|enrollment) ;;
+  *) usage >&2; exit 2 ;;
+esac
+if [ "$#" -ne 1 ]; then usage >&2; exit 2; fi
+if [ "$(uname -s)" != Darwin ]; then
+  printf '%s\n' 'Diagnostics require macOS.' >&2
+  exit 3
+fi
+rc=0
+case "$1" in
+  status)
+    probe 'macOS' /usr/bin/sw_vers -productVersion || rc=1
+    probe 'Architecture' /usr/bin/uname -m || rc=1
+    ;;
+  security)
+    probe 'System Integrity Protection' /usr/bin/csrutil status || rc=1
+    probe 'FileVault' /usr/bin/fdesetup status || rc=1
+    probe 'Gatekeeper' /usr/sbin/spctl --status || rc=1
+    ;;
+  enrollment)
+    probe 'Enrollment' /usr/bin/profiles status -type enrollment || rc=1
+    ;;
+esac
+exit "$rc"
