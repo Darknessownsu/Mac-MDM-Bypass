@@ -1,0 +1,23 @@
+name: MacAdmin foundation CI
+on:
+  push:
+    branches: ['foundation/macadmin-v2']
+  pull_request:
+    branches: [main, 'foundation/macadmin-v2']
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Syntax and isolated tests
+        run: |
+          bash -n bin/macadmin
+          bash -n lib/core.sh
+          bash -n lib/diagnostics.sh
+          bash tests/smoke.sh
+          bash tests/unit.sh
