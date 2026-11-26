@@ -24,3 +24,6 @@ jobs:
           bash -n lib/classify.sh
           bash tests/unit.sh
           bash tests/classification.sh
+          bash -n lib/menu.sh
+          bash -n scripts/package.sh
+          bash tests/package.sh
