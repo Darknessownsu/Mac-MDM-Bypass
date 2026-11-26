@@ -3,11 +3,10 @@ probe() {
   local label="$1" output rc
   shift
   if output=$("$@" 2>&1); then
-    printf '%s: %s\n' "$label" "$output"
-    return 0
+    report_result "$label" completed 0 "$output"
   else
     rc=$?
-    printf '%s: unavailable (exit %s)\n' "$label" "$rc"
+    report_result "$label" unavailable "$rc" ''
     return 1
   fi
 }
