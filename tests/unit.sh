@@ -1,6 +1,7 @@
 #!/bin/bash
 set -eu
 root="$(cd "$(dirname "$0")/.." && pwd)"
+. "$root/lib/classify.sh"
 . "$root/lib/report.sh"
 . "$root/lib/core.sh"
 . "$root/lib/diagnostics.sh"
@@ -13,10 +14,10 @@ out=$(probe Test bash -c 'printf secret >&2; exit 7') || rc=$?
 [ "$out" = 'Test: unavailable (exit 7)' ]
 report_format=shared
 out=$(probe Test printf '%s' 'private value')
-[ "$out" = 'Test: completed (exit 0)' ]
+[ "$out" = 'Test: completed (exit 0; classification not_assessed)' ]
 report_format=json
 out=$(report_begin; probe Test printf '%s' 'private value'; probe Other bash -c 'exit 7' || :; report_end)
-[ "$out" = '{"schema_version":1,"privacy":"status-only","checks":[{"check":"Test","status":"completed","exit_code":0},{"check":"Other","status":"unavailable","exit_code":7}]}' ]
+[ "$out" = '{"schema_version":2,"privacy":"status-only","checks":[{"check":"Test","status":"completed","exit_code":0,"classification":"not_assessed"},{"check":"Other","status":"unavailable","exit_code":7,"classification":"unknown"}]}' ]
 # Mock probe calls; never execute real macOS tools.
 probe() { printf '%s\n' "$1"; [ "$1" != FileVault ]; }
 rc=0
